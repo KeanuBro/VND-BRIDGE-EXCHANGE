@@ -120,31 +120,12 @@ async def send_step(callback_or_message, photo_path, text, markup):
             await callback_or_message.answer_photo(photo=photo, caption=text, parse_mode="HTML", reply_markup=markup)
     else:
         if isinstance(callback_or_message, types.CallbackQuery):
-            await edit_or_resend(callback_or_message, text, markup)
+            try:
+                await callback_or_message.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+            except TelegramBadRequest:
+                pass
         else:
             await callback_or_message.answer(text, parse_mode="HTML", reply_markup=markup)
-
-# Редактирование/переотправка сообщения. Фото-сообщения не имеют text (только caption),
-# поэтому edit_text на них падает с TelegramBadRequest — в этом случае удаляем и отправляем заново.
-async def edit_or_resend(callback: types.CallbackQuery, text: str, markup=None):
-    msg = callback.message
-    if msg.photo or msg.document or msg.animation or msg.video:
-        try:
-            await msg.delete()
-        except Exception:
-            pass
-        await msg.answer(text, parse_mode="HTML", reply_markup=markup)
-        return
-    try:
-        await msg.edit_text(text, parse_mode="HTML", reply_markup=markup)
-    except TelegramBadRequest as e:
-        if "message is not modified" in str(e):
-            return
-        try:
-            await msg.delete()
-        except Exception:
-            pass
-        await msg.answer(text, parse_mode="HTML", reply_markup=markup)
 
 # === ГЛАВНОЕ МЕНЮ ===
 async def send_main_menu(message: types.Message | types.CallbackQuery):
@@ -202,7 +183,10 @@ async def personal_cabinet(callback: types.CallbackQuery):
     builder.button(text="🔙 Назад в меню", callback_data="back_to_start")
     builder.adjust(1)
 
-    await edit_or_resend(callback, text, builder.as_markup())
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    except TelegramBadRequest:
+        pass
     await callback.answer()
 
 @dp.callback_query(F.data == "history")
@@ -238,7 +222,10 @@ async def exchange_history(callback: types.CallbackQuery):
             
             text += f"<b>Заявка #{order_id}</b> | {status_icon}\nОтдали: {a_in_str} {curr}\nПолучили: {a_out_str} VND\n〰️〰️〰️〰️〰️〰️〰️\n"
 
-    await edit_or_resend(callback, text, builder.as_markup())
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    except TelegramBadRequest:
+        pass
     await callback.answer()
 
 # === ЛОГИКА ОБМЕНА ===
@@ -377,7 +364,10 @@ async def process_delivery(callback: types.CallbackQuery, state: FSMContext):
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад к выбору", callback_data="back_to_amount_from_del")
     
-    await edit_or_resend(callback, instruction, builder.as_markup())
+    try:
+        await callback.message.edit_text(instruction, parse_mode="HTML", reply_markup=builder.as_markup())
+    except TelegramBadRequest:
+        pass
         
     await state.set_state(ExchangeFlow.waiting_for_details)
     await callback.answer()
@@ -456,7 +446,10 @@ async def cancel_order(callback: types.CallbackQuery):
 
     await bot.send_message(ADMIN_CHAT_ID, f"⚠️ <b>Заявка #{order_id} ОТМЕНЕНА клиентом!</b>", parse_mode="HTML")
     
-    await edit_or_resend(callback, f"❌ Заявка #{order_id} отменена.\nНажмите /start, чтобы создать новую.", None)
+    try:
+        await callback.message.edit_text(f"❌ Заявка #{order_id} отменена.\nНажмите /start, чтобы создать новую.", parse_mode="HTML")
+    except TelegramBadRequest:
+        pass
     await callback.answer("Заявка отменена")
 
 # === ПОДДЕРЖКА ===
@@ -470,7 +463,10 @@ async def live_support_start(callback: types.CallbackQuery, state: FSMContext):
         "Напишите ваш вопрос ниже, и оператор ответит вам в течение 2 минут прямо в этом чате:"
     )
     
-    await edit_or_resend(callback, text, builder.as_markup())
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    except TelegramBadRequest:
+        pass
         
     await state.set_state(ExchangeFlow.live_support)
     await callback.answer()
@@ -510,7 +506,10 @@ async def admin_panel_callback(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 В главное меню", callback_data="back_to_start")
     
-    await edit_or_resend(callback, text, builder.as_markup())
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    except TelegramBadRequest:
+        pass
     await callback.answer()
 
 @dp.message(Command("setrate"))
